@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
 const {
     addFeedback, getAllFeedback, deleteFeedback, quarantineFeedback,
     getFeedbackPhoto,
@@ -10,44 +11,27 @@ const {
 const { verifySignature } = require('./eddsa');
 const crypto = require('crypto');
 
-// --- NODEMAILER GMAIL CONFIGURATION ---
-const SENDER_EMAIL = process.env.EMAIL_USER;
-const SENDER_PASS = process.env.EMAIL_PASS;
-
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: SENDER_EMAIL,
-        pass: SENDER_PASS // This MUST be an App Password, not your normal password
-    }
-});
-
 const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
-    if (!SENDER_EMAIL || !SENDER_PASS) {
-        console.warn("Missing Gmail credentials in .env file!");
-        return { error: "Missing email credentials" };
-    }
-
     try {
-        const mailOptions = {
-            from: `"UA Canteen Bot" <${SENDER_EMAIL}>`,
+        const payload = {
+            from: 'onboarding@resend.dev', // Default sender for new accounts
             to: toEmail,
             subject: subject,
             text: textContent,
+            html: htmlContent
         };
 
-        if (htmlContent) mailOptions.html = htmlContent;
-        
         if (attachmentBuffer && attachmentName) {
-            mailOptions.attachments = [{
+            payload.attachments = [{
                 filename: attachmentName,
-                content: attachmentBuffer
+                content: attachmentBuffer.toString('base64')
             }];
         }
 
-        const info = await transporter.sendMail(mailOptions);
-        return { data: info };
+        const data = await resend.emails.send(payload);
+        return { data };
     } catch (err) {
+        console.error("Resend Error:", err);
         return { error: err.message };
     }
 };
