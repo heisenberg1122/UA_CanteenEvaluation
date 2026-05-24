@@ -10,11 +10,16 @@ const {
 } = require('./db');
 const { verifySignature } = require('./eddsa');
 const crypto = require('crypto');
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+
+if (RESEND_FROM_EMAIL === 'onboarding@resend.dev') {
+    console.warn('⚠️ RESEND_FROM_EMAIL is still set to onboarding@resend.dev. Verify a domain in Resend and update this sender address to stop the 403 test-domain restriction.');
+}
 
 const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
     try {
         const payload = {
-            from: 'onboarding@resend.dev', // Default sender for new accounts
+            from: RESEND_FROM_EMAIL,
             to: toEmail,
             subject: subject,
             text: textContent,
