@@ -10,30 +10,17 @@ const {
 } = require('./db');
 const { verifySignature } = require('./eddsa');
 const crypto = require('crypto');
-const VERIFIED_RESEND_FROM_EMAIL = 'system@uacanteen.site';
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL && process.env.RESEND_FROM_EMAIL !== 'onboarding@resend.dev'
-    ? process.env.RESEND_FROM_EMAIL
-    : VERIFIED_RESEND_FROM_EMAIL;
-const RESEND_TEST_RECIPIENT = process.env.RESEND_TEST_RECIPIENT || '';
-
-if (!process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL === 'onboarding@resend.dev') {
-    console.warn(`⚠️ RESEND_FROM_EMAIL was not set to a verified sender, so the backend is using ${VERIFIED_RESEND_FROM_EMAIL}. Update your deployment env to match this verified sender.`);
-}
+const RESEND_FROM_EMAIL = 'cjmquiambao.student@ua.edu.ph';
 
 const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
     try {
-        const recipient = RESEND_TEST_RECIPIENT || toEmail;
         const payload = {
             from: RESEND_FROM_EMAIL,
-            to: recipient,
+            to: toEmail,
             subject: subject,
             text: textContent,
             html: htmlContent
         };
-
-        if (RESEND_TEST_RECIPIENT) {
-            console.warn(`⚠️ RESEND_TEST_RECIPIENT is set; routing email intended for ${toEmail} to ${recipient} instead.`);
-        }
 
         if (attachmentBuffer && attachmentName) {
             payload.attachments = [{
