@@ -22,11 +22,11 @@ export default function AdminDashboard({ navigate }) {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 6;
 
-  // 👉 NEW: Role-Based Access Control (Admin vs Viewer)
+  // Role-Based Access Control (Admin vs Viewer)
   const [userRole, setUserRole] = useState('admin');
   const [userName, setUserName] = useState('UA Admin');
 
-  // 👉 NEW: Ranking Filter
+  // Ranking Filter
   const [rankingFilter, setRankingFilter] = useState("Overall");
 
   useEffect(() => {
@@ -40,7 +40,6 @@ export default function AdminDashboard({ navigate }) {
     } catch (e) { }
   }, []);
 
-  // 👉 NEW: State for the Stall Filter dropdown
   // State for the Stall Filter dropdown
   const [dashboardStallFilter, setDashboardStallFilter] = useState("All");
   const [stallsList, setStallsList] = useState([]);
@@ -136,7 +135,6 @@ export default function AdminDashboard({ navigate }) {
       return stallName === dashboardStallFilter;
     });
 
-  // Math uses `dashboardFeedbacks` instead of `safeFeedbacks`
   const total = dashboardFeedbacks.length;
   const avgValue = total > 0 ? Number((dashboardFeedbacks.reduce((sum, f) => sum + f.rating, 0) / total).toFixed(2)) : 0;
   const avgPercent = Math.round((avgValue / 5) * 100);
@@ -270,7 +268,6 @@ export default function AdminDashboard({ navigate }) {
     link.remove();
   };
 
-  // Extracts Stall Name from the comment
   const parseFeedbackData = (text) => {
     if (!text) return { stall: null, metrics: null, text: "No comment provided." };
 
@@ -301,7 +298,6 @@ export default function AdminDashboard({ navigate }) {
     };
   };
 
-  // 👉 NEW: Download PDF Report logic
   const handleDownloadReport = () => {
     let url = `${API_URL}/reports/overall`;
     if (dashboardStallFilter !== "All" && dashboardStallFilter !== "General Feedback") {
@@ -311,7 +307,6 @@ export default function AdminDashboard({ navigate }) {
     window.open(url, '_blank');
   };
 
-  // UI COMPONENTS
   const MenuItem = ({ id, icon: Icon, label, badge }) => {
     const isActive = activeMenu === id;
     return (
@@ -473,8 +468,6 @@ export default function AdminDashboard({ navigate }) {
                     totalScore += f.rating;
                     validCount++;
                   } else {
-                    // Extract cryptographically secure criteria scoring from string payload!
-                    // Example: Food: 5/5 | Service: 5/5
                     const criteriaMatch = f.comment?.match(new RegExp(`${rankingFilter}: (\\d+)/5`));
                     if (criteriaMatch) {
                       totalScore += parseInt(criteriaMatch[1], 10);
@@ -494,7 +487,7 @@ export default function AdminDashboard({ navigate }) {
                   validScoreCount: validCount
                 };
               }).filter(s => s.total > 0).sort((a, b) => b.avg - a.avg).map((stall, idx) => (
-                <div key={stall.name} style={{ display: 'flex', alignItems: 'center', padding: '20px 24px', backgroundColor: colors.white, borderRadius: '16px', border: `1px solid ${colors.border}`, boxShadow: '0 8px 20px rgba(0,0,0,0.03)', gap: '24px', position: 'relative', overflow: 'hidden', transition: 'transform 0.2s', cursor: 'default' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+                <div key={stall.id} style={{ display: 'flex', alignItems: 'center', padding: '20px 24px', backgroundColor: colors.white, borderRadius: '16px', border: `1px solid ${colors.border}`, boxShadow: '0 8px 20px rgba(0,0,0,0.03)', gap: '24px', position: 'relative', overflow: 'hidden', transition: 'transform 0.2s', cursor: 'default' }} onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'} onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
 
                   {/* Rank Indicator */}
                   <div style={{ width: '48px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
@@ -611,7 +604,6 @@ export default function AdminDashboard({ navigate }) {
                   </select>
                 </div>
 
-                {/* 👉 NEW: PDF Download Button connected to reportGenerator! */}
                 <button
                   onClick={handleDownloadReport}
                   style={{ backgroundColor: colors.navy, color: colors.white, border: 'none', padding: '12px 20px', borderRadius: '8px', fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', transition: 'background-color 0.2s', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
@@ -672,8 +664,8 @@ export default function AdminDashboard({ navigate }) {
                 {count === 0 ? (
                   <div style={{ height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, fontSize: '15px' }}>No safe records available.</div>
                 ) : (
-                  <div style={{ height: '300px', width: '100%' }}>
-                    <ResponsiveContainer>
+                  <div style={{ height: '300px', width: '100%', minWidth: 0 }}>
+                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                       <BarChart data={barData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                         <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 13, fontWeight: 500 }} dy={10} />
@@ -692,8 +684,8 @@ export default function AdminDashboard({ navigate }) {
                   <div style={{ height: '250px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, fontSize: '15px' }}>No safe records available.</div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', alignItems: 'center', gap: '16px' }}>
-                    <div style={{ height: '260px', width: '100%', position: 'relative' }}>
-                      <ResponsiveContainer>
+                    <div style={{ height: '260px', width: '100%', position: 'relative', minWidth: 0 }}>
+                      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                         <PieChart>
                           <Pie data={pieData} innerRadius={65} outerRadius={100} paddingAngle={4} dataKey="value" stroke="none">
                             {pieData.map((entry, index) => <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
@@ -713,7 +705,7 @@ export default function AdminDashboard({ navigate }) {
                     <div>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                         {pieData.map((entry, index) => (
-                          <div key={entry.star} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', color: colors.text }}>
+                          <div key={`legend-${index}-${entry.star}`} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px', color: colors.text }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }} />
                               <span style={{ fontWeight: 500 }}>{entry.star} Star</span>
@@ -780,7 +772,6 @@ export default function AdminDashboard({ navigate }) {
                         </td>
                         <td style={{ padding: '20px 12px', color: colors.text, fontSize: '15px', fontWeight: 600 }}>{f.customer_name || 'Anonymous'}</td>
 
-                        {/* Table now shows Stall name */}
                         <td style={{ padding: '20px 12px', fontSize: '14px', color: colors.textMuted, lineHeight: 1.5 }}>
                           {parsed.stall && <span style={{ color: colors.navy, fontWeight: 600, backgroundColor: '#F1F5F9', padding: '4px 10px', borderRadius: '6px', marginRight: '8px' }}>{parsed.stall}</span>}
                           {parsed.metrics && <span style={{ fontSize: '12px', color: colors.textMuted }}>Metrics</span>}
@@ -955,7 +946,6 @@ export default function AdminDashboard({ navigate }) {
                         </td>
                         <td style={{ padding: '20px 12px', color: colors.text, fontSize: '15px', fontWeight: 600 }}>{f.customer_name || 'Anonymous'}</td>
 
-                        {/* Table now shows Stall name */}
                         <td style={{ padding: '20px 12px', fontSize: '14px', color: colors.textMuted, lineHeight: 1.5 }}>
                           {parsed.stall && <span style={{ color: '#991B1B', fontWeight: 600, backgroundColor: '#FEE2E2', padding: '4px 10px', borderRadius: '6px', marginRight: '8px' }}>{parsed.stall}</span>}
                           {parsed.metrics && <span style={{ fontSize: '12px', color: colors.textMuted }}>Metrics</span>}
@@ -991,7 +981,6 @@ export default function AdminDashboard({ navigate }) {
             <h2 style={{ fontSize: '24px', fontWeight: 700, color: colors.navy, margin: '0 0 8px 0', letterSpacing: '-0.02em' }}>Feedback Report</h2>
             <p style={{ fontSize: '14px', color: colors.textMuted, margin: '0 0 32px 0' }}>ID #{selectedFeedback.id} • Submitted via EdDSA Portal</p>
 
-            {/* Modal now shows Stall name */}
             <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: `1px solid ${colors.border}`, paddingBottom: '16px', marginBottom: '16px' }}>
               <span style={{ fontSize: '13px', color: colors.textMuted, fontWeight: 600, letterSpacing: '0.05em' }}>STALL REVIEWED</span>
               <span style={{ fontWeight: 700, color: colors.navy, fontSize: '15px', backgroundColor: '#F1F5F9', padding: '4px 12px', borderRadius: '6px' }}>

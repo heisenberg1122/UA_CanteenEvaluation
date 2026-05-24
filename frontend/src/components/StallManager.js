@@ -11,7 +11,7 @@ export default function StallManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
-  
+
   // Custom Modal State
   const [modalState, setModalState] = useState({ isOpen: false, title: "", message: "", type: "success" });
   const showModal = (title, message, type = "success") => setModalState({ isOpen: true, title, message, type });
@@ -67,7 +67,7 @@ export default function StallManager() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!newName.trim()) return;
-    
+
     try {
       const isEditing = !!editingStallId;
       const existingStall = isEditing ? stalls.find(s => s.id === editingStallId) : null;
@@ -84,7 +84,7 @@ export default function StallManager() {
         const newStall = await addStall(newName.trim(), newImage, emailInput);
         setStalls([...stalls, newStall]);
       }
-      
+
       handleCancelEdit();
       setError("");
 
@@ -112,7 +112,7 @@ export default function StallManager() {
     setNewName("");
     setNewImage(null);
     setNewEmail("");
-    if(fileInputRef.current) fileInputRef.current.value = "";
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const handleDownloadQR = (stallName) => {
@@ -120,27 +120,27 @@ export default function StallManager() {
       const safeStallName = encodeURIComponent(stallName);
       // Hardcode localhost base for development (or process.env in production)
       const targetUrl = `${window.location.origin}/?stall=${safeStallName}`;
-      
+
       const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(targetUrl)}&margin=20`;
-      
+
       // Fetch the binary data, convert to a Blob so we can force a raw download instead of bouncing the browser tab
       fetch(qrApiUrl)
         .then(res => res.blob())
         .then(blob => {
-           const url = window.URL.createObjectURL(blob);
-           const a = document.createElement('a');
-           a.style.display = 'none';
-           a.href = url;
-           a.download = `QR_${stallName.replace(/\s+/g, '_')}.png`;
-           document.body.appendChild(a);
-           a.click();
-           window.URL.revokeObjectURL(url);
-           document.body.removeChild(a);
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.style.display = 'none';
+          a.href = url;
+          a.download = `QR_${stallName.replace(/\s+/g, '_')}.png`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
         })
         .catch(err => {
-           showModal("Error", "Failed to generate QR. Ensure you have an active internet connection.", "error");
+          showModal("Error", "Failed to generate QR. Ensure you have an active internet connection.", "error");
         });
-    } catch(e) {}
+    } catch (e) { }
   };
 
   const handleDelete = async (id) => {
@@ -167,7 +167,7 @@ export default function StallManager() {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '32px', alignItems: 'start' }}>
-      
+
       {/* ─── LEFT COLUMN: FORM ─── */}
       <div style={{ backgroundColor: colors.white, borderRadius: '16px', padding: '32px', border: `1px solid ${colors.border}`, boxShadow: '0 4px 15px rgba(0,0,0,0.03)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', borderBottom: `1px solid ${colors.border}`, paddingBottom: '20px' }}>
@@ -180,80 +180,80 @@ export default function StallManager() {
           </div>
         </div>
 
-      {error && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#FEF2F2', color: colors.red, padding: '16px', borderRadius: '8px', marginBottom: '24px', fontSize: '14px', fontWeight: 500, border: '1px solid #FECACA' }}>
-          <AlertCircle size={18} /> {error}
-        </div>
-      )}
-
-      {/* Form Context */}
-      <div style={{ backgroundColor: editingStallId ? '#F0F9FF' : colors.bg, padding: '24px', borderRadius: '12px', border: `1px solid ${editingStallId ? '#BAE6FD' : colors.border}`, transition: 'all 0.3s' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-          <h3 style={{ fontSize: '13px', fontWeight: 700, color: editingStallId ? colors.blue : colors.textMuted, letterSpacing: '0.05em', margin: 0 }}>
-            {editingStallId ? 'EDITING STALL' : 'ADD NEW STALL'}
-          </h3>
-          {editingStallId && (
-            <button onClick={handleCancelEdit} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Cancel Edit</button>
-          )}
-        </div>
-        
-        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: colors.navy, marginBottom: '8px' }}>Stall Name <span style={{ color: colors.red }}>*</span></label>
-            <input 
-              type="text" 
-              placeholder="e.g., Dad Bobs..." 
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              style={{ width: '100%', padding: '14px 16px', borderRadius: '8px', border: `1px solid ${colors.border}`, fontSize: '15px', outline: 'none', boxSizing: 'border-box' }}
-            />
+        {error && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#FEF2F2', color: colors.red, padding: '16px', borderRadius: '8px', marginBottom: '24px', fontSize: '14px', fontWeight: 500, border: '1px solid #FECACA' }}>
+            <AlertCircle size={18} /> {error}
           </div>
+        )}
 
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: colors.navy, marginBottom: '8px' }}>Stall Owner Email (Optional) <Mail size={14} style={{display: 'inline', verticalAlign: 'middle', marginLeft: '4px'}} /></label>
-            <input 
-              type="email" 
-              placeholder="owner@example.com" 
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              style={{ width: '100%', padding: '14px 16px', borderRadius: '8px', border: `1px solid ${colors.border}`, fontSize: '15px', outline: 'none', boxSizing: 'border-box' }}
-            />
-          </div>
-
-          <div>
-            <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: colors.navy, marginBottom: '8px' }}>Cover Photo (Optional)</label>
-            <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display: 'none' }} />
-            
-            {!newImage ? (
-              <div
-                onClick={() => fileInputRef.current.click()}
-                style={{ width: '100%', padding: '20px', border: `2px dashed ${colors.border}`, borderRadius: '8px', backgroundColor: colors.white, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.2s', boxSizing: 'border-box' }}
-              >
-                <div style={{ backgroundColor: colors.bg, padding: '8px', borderRadius: '50%' }}><ImageIcon size={20} color={colors.textMuted} /></div>
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  <span style={{ fontSize: '14px', color: colors.text, fontWeight: 500 }}>Click to upload cover photo</span>
-                  <span style={{ fontSize: '12px', color: colors.textMuted }}>Recommended ratio 16:9 (JPG/PNG)</span>
-                </div>
-              </div>
-            ) : (
-              <div style={{ position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.border}` }}>
-                <img src={newImage} alt="Stall Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                <button type="button" onClick={() => { setNewImage(null); if(fileInputRef.current) fileInputRef.current.value = ""; }} style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-                  <X size={14} />
-                </button>
-              </div>
+        {/* Form Context */}
+        <div style={{ backgroundColor: editingStallId ? '#F0F9FF' : colors.bg, padding: '24px', borderRadius: '12px', border: `1px solid ${editingStallId ? '#BAE6FD' : colors.border}`, transition: 'all 0.3s' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h3 style={{ fontSize: '13px', fontWeight: 700, color: editingStallId ? colors.blue : colors.textMuted, letterSpacing: '0.05em', margin: 0 }}>
+              {editingStallId ? 'EDITING STALL' : 'ADD NEW STALL'}
+            </h3>
+            {editingStallId && (
+              <button onClick={handleCancelEdit} style={{ background: 'none', border: 'none', color: colors.textMuted, cursor: 'pointer', fontSize: '13px', fontWeight: 600 }}>Cancel Edit</button>
             )}
           </div>
 
-          <button 
-            type="submit" 
-            disabled={!newName.trim()}
-            style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: newName.trim() ? (editingStallId ? colors.blue : colors.navy) : '#94A3B8', color: colors.white, border: 'none', padding: '16px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: newName.trim() ? 'pointer' : 'not-allowed', transition: 'all 0.2s', marginTop: '8px' }}
-          >
-            {editingStallId ? <><Save size={18} /> Update Stall</> : <><Plus size={18} /> Add Stall to Database</>}
-          </button>
-        </form>
-      </div>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: colors.navy, marginBottom: '8px' }}>Stall Name <span style={{ color: colors.red }}>*</span></label>
+              <input
+                type="text"
+                placeholder="e.g., Dad Bobs..."
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                style={{ width: '100%', padding: '14px 16px', borderRadius: '8px', border: `1px solid ${colors.border}`, fontSize: '15px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: colors.navy, marginBottom: '8px' }}>Stall Owner Email <span style={{ color: colors.red }}>*</span> <Mail size={14} style={{ display: 'inline', verticalAlign: 'middle', marginLeft: '4px' }} /></label>
+              <input
+                type="email"
+                placeholder="owner@example.com"
+                value={newEmail}
+                onChange={(e) => setNewEmail(e.target.value)}
+                style={{ width: '100%', padding: '14px 16px', borderRadius: '8px', border: `1px solid ${colors.border}`, fontSize: '15px', outline: 'none', boxSizing: 'border-box' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, color: colors.navy, marginBottom: '8px' }}>Cover Photo </label>
+              <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} style={{ display: 'none' }} />
+
+              {!newImage ? (
+                <div
+                  onClick={() => fileInputRef.current.click()}
+                  style={{ width: '100%', padding: '20px', border: `2px dashed ${colors.border}`, borderRadius: '8px', backgroundColor: colors.white, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '12px', transition: 'all 0.2s', boxSizing: 'border-box' }}
+                >
+                  <div style={{ backgroundColor: colors.bg, padding: '8px', borderRadius: '50%' }}><ImageIcon size={20} color={colors.textMuted} /></div>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '14px', color: colors.text, fontWeight: 500 }}>Click to upload cover photo</span>
+                    <span style={{ fontSize: '12px', color: colors.textMuted }}>Recommended ratio 16:9 (JPG/PNG)</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ position: 'relative', width: '100%', height: '140px', borderRadius: '8px', overflow: 'hidden', border: `1px solid ${colors.border}` }}>
+                  <img src={newImage} alt="Stall Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <button type="button" onClick={() => { setNewImage(null); if (fileInputRef.current) fileInputRef.current.value = ""; }} style={{ position: 'absolute', top: '8px', right: '8px', backgroundColor: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: '28px', height: '28px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              disabled={!newName.trim()}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', backgroundColor: newName.trim() ? (editingStallId ? colors.blue : colors.navy) : '#94A3B8', color: colors.white, border: 'none', padding: '16px', borderRadius: '8px', fontSize: '15px', fontWeight: 600, cursor: newName.trim() ? 'pointer' : 'not-allowed', transition: 'all 0.2s', marginTop: '8px' }}
+            >
+              {editingStallId ? <><Save size={18} /> Update Stall</> : <><Plus size={18} /> Add Stall to Database</>}
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* ─── RIGHT COLUMN: ACTIVE STALLS ─── */}
@@ -262,7 +262,7 @@ export default function StallManager() {
           ACTIVE STALLS DIRECTORY
           <span style={{ backgroundColor: 'rgba(59, 130, 246, 0.1)', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', color: colors.blue }}>{stalls.length} Total</span>
         </h3>
-        
+
         {loading ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: colors.textMuted, fontSize: '14px', padding: '24px 0', justifyContent: 'center' }}>
             <Loader2 size={18} style={{ animation: 'spin 1s linear infinite' }} /> Loading...
@@ -278,14 +278,19 @@ export default function StallManager() {
               <div key={stall.id} style={{ display: 'flex', alignItems: 'center', padding: '16px', borderBottom: `1px solid ${colors.border}`, backgroundColor: editingStallId === stall.id ? '#F8FAFC' : 'transparent', gap: '16px', transition: 'background-color 0.2s' }} onMouseEnter={e => { if (editingStallId !== stall.id) e.currentTarget.style.backgroundColor = '#F8FAFC'; }} onMouseLeave={e => { if (editingStallId !== stall.id) e.currentTarget.style.backgroundColor = 'transparent'; }}>
                 <div style={{ width: '48px', height: '48px', borderRadius: '8px', backgroundColor: colors.bg, overflow: 'hidden', flexShrink: 0 }}>
                   {stall.image ? (
-                    <img src={stall.image} alt={stall.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img
+                      src={stall.image}
+                      alt={stall.name}
+                      crossOrigin="anonymous"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
                   ) : (
                     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       <Store size={20} color="#94A3B8" />
                     </div>
                   )}
                 </div>
-                
+
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
                   <span style={{ fontWeight: 600, color: colors.text, fontSize: '15px' }}>{stall.name}</span>
                   {stall.email && (
@@ -294,10 +299,10 @@ export default function StallManager() {
                     </span>
                   )}
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '6px' }}>
                   {stall.is_email_verified && (
-                    <button 
+                    <button
                       onClick={() => handleSendReport(stall.id)}
                       style={{ background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#059669', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
                       title="Send AI Report via Email"
@@ -305,21 +310,21 @@ export default function StallManager() {
                       <Send size={16} />
                     </button>
                   )}
-                  <button 
+                  <button
                     onClick={() => handleDownloadQR(stall.name)}
                     style={{ background: '#FAF5FF', border: '1px solid #E9D5FF', color: '#9333EA', cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
                     title="Download Auto-Routing QR Code"
                   >
                     <QrCode size={16} />
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleEditClick(stall)}
                     style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', color: colors.blue, cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
                     title="Edit Stall"
                   >
                     <Edit3 size={16} />
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDelete(stall.id)}
                     style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: colors.red, cursor: 'pointer', padding: '8px', borderRadius: '8px', display: 'flex', alignItems: 'center' }}
                     title="Remove Stall"

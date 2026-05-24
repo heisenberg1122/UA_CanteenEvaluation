@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const nodemailer = require('nodemailer');
 const {
     addFeedback, getAllFeedback, deleteFeedback, quarantineFeedback,
     getFeedbackPhoto,
@@ -8,54 +9,50 @@ const {
 } = require('./db');
 const { verifySignature } = require('./eddsa');
 const crypto = require('crypto');
-// Brevo API Configuration (Bypasses Render SMTP Block & Allows Free Sending without Custom Domain)
-const BREVO_API_KEY = process.env.BREVO_API_KEY;
-const SENDER_EMAIL = process.env.EMAIL_USER; // Your verified Gmail address
 
-const sendBrevoEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
-    if (!BREVO_API_KEY) {
-        console.warn("BREVO_API_KEY is missing! Emails will not be sent.");
-        return { error: "Missing API Key" };
+// --- NODEMAILER GMAIL CONFIGURATION ---
+const SENDER_EMAIL = process.env.EMAIL_USER;
+const SENDER_PASS = process.env.EMAIL_PASS;
+
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: SENDER_EMAIL,
+        pass: SENDER_PASS // This MUST be an App Password, not your normal password
     }
+});
 
-    const payload = {
-        sender: { name: "UA Canteen Bot", email: SENDER_EMAIL },
-        to: [{ email: toEmail }],
-        subject: subject,
-        textContent: textContent,
-    };
-
-    if (htmlContent) payload.htmlContent = htmlContent;
-    
-    if (attachmentBuffer && attachmentName) {
-        payload.attachment = [{
-            name: attachmentName,
-            content: attachmentBuffer.toString('base64')
-        }];
+const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
+    if (!SENDER_EMAIL || !SENDER_PASS) {
+        console.warn("Missing Gmail credentials in .env file!");
+        return { error: "Missing email credentials" };
     }
 
     try {
-        const response = await fetch('https://api.brevo.com/v3/smtp/email', {
-            method: 'POST',
-            headers: {
-                'accept': 'application/json',
-                'api-key': BREVO_API_KEY,
-                'content-type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        });
+        const mailOptions = {
+            from: `"UA Canteen Bot" <${SENDER_EMAIL}>`,
+            to: toEmail,
+            subject: subject,
+            text: textContent,
+        };
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            return { error: errorData };
+        if (htmlContent) mailOptions.html = htmlContent;
+        
+        if (attachmentBuffer && attachmentName) {
+            mailOptions.attachments = [{
+                filename: attachmentName,
+                content: attachmentBuffer
+            }];
         }
-        return { data: await response.json() };
+
+        const info = await transporter.sendMail(mailOptions);
+        return { data: info };
     } catch (err) {
         return { error: err.message };
     }
 };
 
-// CLOUDINARY CONFIGURATION
+// --- CLOUDINARY CONFIGURATION ---
 const cloudinary = require('cloudinary').v2;
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -63,9 +60,6 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-
-
-// 1. Import our new Authentication logic
 const { registerUser, loginUser, requireAuth } = require('./auth');
 
 // --- IDENTITY & AUTH ROUTES ---
@@ -73,14 +67,9 @@ router.post('/register', registerUser);
 router.post('/login', loginUser);
 
 // --- SECURE FEEDBACK ROUTE ---
-// 2. Notice requireAuth is inserted right here as a "bouncer"!
 router.post('/feedback', requireAuth, async (req, res) => {
-
-    // We no longer extract customer_name from req.body!
     let { rating, comment, attachment, signature, public_key } = req.body;
 
-    // AUTHENTICITY ENFORCEMENT: 
-    // We strictly use the identity verified by the JWT token.
     const customer_name = req.user.full_name;
     const user_id = req.user.id;
 
@@ -91,10 +80,8 @@ router.post('/feedback', requireAuth, async (req, res) => {
     if (!comment) return res.status(400).json({ error: 'Comment required' });
     if (!signature || !public_key) return res.status(400).json({ error: 'Cryptographic signature and public key are required.' });
 
-    // Reconstruct the payload WITHOUT the attachment for the signature check
     const feedbackForVerify = { customer_name, rating, comment };
 
-    // 2. VERIFY the frontend's signature BEFORE doing anything else
     try {
         const pubKeyBin = Buffer.from(public_key, 'base64');
         const isValid = verifySignature(pubKeyBin, feedbackForVerify, signature);
@@ -106,18 +93,16 @@ router.post('/feedback', requireAuth, async (req, res) => {
         return res.status(401).json({ error: 'Malformed cryptographic keys provided.' });
     }
 
-    // 3. CLOUDINARY UPLOAD: Now that signature is verified, swap the heavy Base64 string for a Cloud URL!
     try {
         if (attachment && !attachment.startsWith('http')) {
             const uploadRes = await cloudinary.uploader.upload(attachment, { folder: 'ua_canteen/feedback' });
-            attachment = uploadRes.secure_url; // Replace string with URL
+            attachment = uploadRes.secure_url; 
         }
     } catch (uploadError) {
         console.error("Cloudinary Error:", uploadError);
         return res.status(500).json({ error: "Failed to upload image to cloud storage." });
     }
 
-    // 4. Insert it into PostgreSQL linking their user_id and the new short Cloudinary URL!
     try {
         const inserted = await addFeedback({ user_id, customer_name, rating, comment, signature, public_key, attachment });
         res.status(201).json(inserted);
@@ -127,13 +112,11 @@ router.post('/feedback', requireAuth, async (req, res) => {
     }
 });
 
-
 router.get('/feedbacks', async (req, res) => {
     try {
         const rows = await getAllFeedback();
 
         const verifiedRows = rows.map(row => {
-            // Reconstruct the payload WITHOUT the attachment for the signature check
             const feedbackForVerify = {
                 customer_name: row.customer_name,
                 rating: row.rating,
@@ -182,7 +165,6 @@ router.post('/verify', async (req, res) => {
         } catch (e) { }
     }
 
-    // Reconstruct the payload WITHOUT the attachment for the signature check
     const feedbackForVerify = { customer_name, rating, comment };
 
     try {
@@ -213,7 +195,6 @@ router.put('/feedback/:id/quarantine', async (req, res) => {
         res.status(500).json({ error: "Server Error" });
     }
 });
-
 
 // --- PDF REPORT GENERATION ROUTE ---
 const { generateStoreReport, analyzeFeedbackData } = require('./reportGenerator');
@@ -252,7 +233,6 @@ router.get('/reports/stall/:id', async (req, res) => {
         const stall = stallRows.find(s => s.id == req.params.id);
         if (!stall) return res.status(404).json({ error: "Stall not found" });
 
-        // Extract stall's feedbacks directly from comment cryptographic payload
         const rawFeedbacks = await getAllFeedback();
         const verifiedFeedbacks = getVerifiedFeedbacks(rawFeedbacks);
         const stallFeedbacks = verifiedFeedbacks.filter(f => {
@@ -306,15 +286,12 @@ router.post('/stalls/:id/send-report', async (req, res) => {
         });
 
         const reportData = await analyzeFeedbackData(stall.name, stallFeedbacks);
-
-        // Generate PDF Buffer
         const pdfBuffer = await generateStoreReport(reportData);
 
-        // Send Email using Brevo API (Bypasses Render Block)
         const textContent = `Hello ${stall.name} owner,\n\nHere is your automated stall evaluation update.\n\nAI Summary & Recommendations:\n${reportData.ai_summary || 'Please find the details in the attached report.'}\n\nBest,\nUA Canteen System`;
         const filename = `Evaluation_Report_${stall.name.replace(/\s+/g, '_')}.pdf`;
         
-        const { error } = await sendBrevoEmail(
+        const { error } = await sendEmail(
             stall.email, 
             `Automated Evaluation Report: ${stall.name}`, 
             textContent, 
@@ -324,7 +301,7 @@ router.post('/stalls/:id/send-report', async (req, res) => {
         );
 
         if (error) {
-            console.error("Brevo API Error:", error);
+            console.error("\n[Nodemailer Error - Send Report]:", error);
             return res.status(500).json({ error: "Failed to send stall report email." });
         }
 
@@ -334,6 +311,7 @@ router.post('/stalls/:id/send-report', async (req, res) => {
         res.status(500).json({ error: "Failed to send stall report email." });
     }
 });
+
 const getVerificationEmailTemplate = (name, verifyUrl) => `
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
   <div style="background-color: #0c2340; color: #ffffff; padding: 20px; text-align: center;">
@@ -359,7 +337,6 @@ router.post('/stalls', async (req, res) => {
         let { name, image, email } = req.body;
         if (!name) return res.status(400).json({ error: "Stall name is required" });
 
-        // CLOUDINARY UPLOAD: Stalls Cover Photo
         if (image && !image.startsWith('http')) {
             const uploadRes = await cloudinary.uploader.upload(image, { folder: 'ua_canteen/stalls' });
             image = uploadRes.secure_url;
@@ -373,13 +350,14 @@ router.post('/stalls', async (req, res) => {
         const newStall = await addStall(name, image || null, email || null, verificationToken);
 
         if (email) {
+            console.log(`\n[Stall Creation] Attempting to send verification email via Gmail to: ${email}`);
             const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
             const verifyUrl = `${baseUrl}/api/stalls/verify-email?token=${verificationToken}`;
             try {
                 const textContent = `Please verify your email for ${name} by clicking: ${verifyUrl}`;
                 const htmlContent = getVerificationEmailTemplate(name, verifyUrl);
                 
-                const { error } = await sendBrevoEmail(
+                const { error } = await sendEmail(
                     email,
                     `Action Required: Verify ${name} Email`,
                     textContent,
@@ -387,10 +365,12 @@ router.post('/stalls', async (req, res) => {
                 );
 
                 if (error) {
-                    console.error("Email sending failed via Brevo:", error);
+                    console.error("\n[Nodemailer Error - Stall Creation]:", error);
+                } else {
+                    console.log(`[Success] Verification email successfully sent via Gmail for ${email}`);
                 }
             } catch (emailErr) {
-                console.error("Email exception:", emailErr);
+                console.error("\n[Server Error - Email exception]:", emailErr);
             }
         }
 
@@ -408,7 +388,6 @@ router.put('/stalls/:id', async (req, res) => {
         let { name, image, email } = req.body;
         if (!name) return res.status(400).json({ error: "Stall name is required" });
 
-        // CLOUDINARY UPLOAD: Stalls Cover Photo Edit
         if (image && !image.startsWith('http')) {
             const uploadRes = await cloudinary.uploader.upload(image, { folder: 'ua_canteen/stalls' });
             image = uploadRes.secure_url;
@@ -430,14 +409,14 @@ router.put('/stalls/:id', async (req, res) => {
         const updatedStall = await editStall(req.params.id, name, image || null, email || null, isVerified, verificationToken);
 
         if (emailChanged && email) {
+            console.log(`\n[Stall Update] Attempting to send verification email via Gmail to: ${email}`);
             const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
             const verifyUrl = `${baseUrl}/api/stalls/verify-email?token=${verificationToken}`;
             try {
                 const textContent = `Please verify your email for ${name} by clicking: ${verifyUrl}`;
-                // Fallback basic HTML if getVerificationEmailTemplate doesn't exist
-                const htmlContent = `<div style="font-family: sans-serif; padding: 20px;"><h2>Verify Your Email</h2><p>Please verify your stall's email address by clicking the link below:</p><a href="${verifyUrl}" style="background: #0C2340; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Verify Email</a></div>`;
+                const htmlContent = getVerificationEmailTemplate(name, verifyUrl);
                 
-                const { error } = await sendBrevoEmail(
+                const { error } = await sendEmail(
                     email,
                     `Action Required: Verify ${name} Email`,
                     textContent,
@@ -445,10 +424,12 @@ router.put('/stalls/:id', async (req, res) => {
                 );
 
                 if (error) {
-                    console.error("Email sending failed via Brevo:", error);
+                    console.error("\n[Nodemailer Error - Stall Update]:", error);
+                } else {
+                    console.log(`[Success] Verification email successfully sent via Gmail for ${email}`);
                 }
             } catch (emailErr) {
-                console.error("Email exception:", emailErr);
+                console.error("\n[Server Error - Email exception]:", emailErr);
             }
         }
 
