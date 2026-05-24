@@ -1,8 +1,22 @@
 const { Pool } = require('pg');
 
-const pool = new Pool({
-    ssl: process.env.PGHOST !== 'localhost' ? { rejectUnauthorized: false } : false
-});
+const useDatabaseUrl = !!process.env.DATABASE_URL;
+
+const poolConfig = useDatabaseUrl
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    }
+    : {
+        host: process.env.PGHOST || 'localhost',
+        port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
+        user: process.env.PGUSER,
+        password: process.env.PGPASSWORD,
+        database: process.env.PGDATABASE,
+        ssl: (process.env.PGHOST || 'localhost') !== 'localhost' ? { rejectUnauthorized: false } : false
+    };
+
+const pool = new Pool(poolConfig);
 
 async function initDB() {
     try {
@@ -48,7 +62,7 @@ async function initDB() {
 
         console.log("Database initialized: 'users', 'feedbacks', and 'stalls' tables are ready.");
     } catch (err) {
-        console.error("Failed to create table:", err.message);
+        console.error("Failed to create table:", err);
     }
 }
 
