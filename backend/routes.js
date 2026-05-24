@@ -10,7 +10,7 @@ const {
 } = require('./db');
 const { verifySignature } = require('./eddsa');
 const crypto = require('crypto');
-const RESEND_FROM_EMAIL = 'cjmquiambao.student@ua.edu.ph';
+const RESEND_FROM_EMAIL = 'system@uacanteen.site';
 
 const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
     try {
