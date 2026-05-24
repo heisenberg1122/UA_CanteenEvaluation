@@ -11,6 +11,7 @@ const {
 const { verifySignature } = require('./eddsa');
 const crypto = require('crypto');
 const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+const RESEND_TEST_RECIPIENT = process.env.RESEND_TEST_RECIPIENT || '';
 
 if (RESEND_FROM_EMAIL === 'onboarding@resend.dev') {
     console.warn('⚠️ RESEND_FROM_EMAIL is still set to onboarding@resend.dev. Verify a domain in Resend and update this sender address to stop the 403 test-domain restriction.');
@@ -18,13 +19,18 @@ if (RESEND_FROM_EMAIL === 'onboarding@resend.dev') {
 
 const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
     try {
+        const recipient = RESEND_TEST_RECIPIENT || toEmail;
         const payload = {
             from: RESEND_FROM_EMAIL,
-            to: toEmail,
+            to: recipient,
             subject: subject,
             text: textContent,
             html: htmlContent
         };
+
+        if (RESEND_TEST_RECIPIENT) {
+            console.warn(`⚠️ RESEND_TEST_RECIPIENT is set; routing email intended for ${toEmail} to ${recipient} instead.`);
+        }
 
         if (attachmentBuffer && attachmentName) {
             payload.attachments = [{
