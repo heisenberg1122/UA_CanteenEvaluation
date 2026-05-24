@@ -10,11 +10,14 @@ const {
 } = require('./db');
 const { verifySignature } = require('./eddsa');
 const crypto = require('crypto');
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+const VERIFIED_RESEND_FROM_EMAIL = 'system@uacanteen.site';
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL && process.env.RESEND_FROM_EMAIL !== 'onboarding@resend.dev'
+    ? process.env.RESEND_FROM_EMAIL
+    : VERIFIED_RESEND_FROM_EMAIL;
 const RESEND_TEST_RECIPIENT = process.env.RESEND_TEST_RECIPIENT || '';
 
-if (RESEND_FROM_EMAIL === 'onboarding@resend.dev') {
-    console.warn('⚠️ RESEND_FROM_EMAIL is still set to onboarding@resend.dev. Verify a domain in Resend and update this sender address to stop the 403 test-domain restriction.');
+if (!process.env.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL === 'onboarding@resend.dev') {
+    console.warn(`⚠️ RESEND_FROM_EMAIL was not set to a verified sender, so the backend is using ${VERIFIED_RESEND_FROM_EMAIL}. Update your deployment env to match this verified sender.`);
 }
 
 const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
