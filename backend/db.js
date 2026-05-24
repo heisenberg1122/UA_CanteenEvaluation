@@ -1,22 +1,18 @@
 const { Pool } = require('pg');
 
-const useDatabaseUrl = !!process.env.DATABASE_URL;
+// Render INTERNAL connections do NOT support SSL.
+// Render EXTERNAL connections REQUIRE SSL.
+// This safely checks if you are using an external URL (.render.com)
+const isExternal = process.env.PGHOST && process.env.PGHOST.includes('render.com');
 
-const poolConfig = useDatabaseUrl
-    ? {
-        connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false }
-    }
-    : {
-        host: process.env.PGHOST || 'localhost',
-        port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
-        user: process.env.PGUSER,
-        password: process.env.PGPASSWORD,
-        database: process.env.PGDATABASE,
-        ssl: (process.env.PGHOST || 'localhost') !== 'localhost' ? { rejectUnauthorized: false } : false
-    };
-
-const pool = new Pool(poolConfig);
+const pool = new Pool({
+    host: process.env.PGHOST || 'localhost',
+    port: process.env.PGPORT ? Number(process.env.PGPORT) : 5432,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
+    database: process.env.PGDATABASE,
+    ssl: isExternal ? { rejectUnauthorized: false } : false
+});
 
 async function initDB() {
     try {
@@ -60,9 +56,9 @@ async function initDB() {
         await pool.query(`ALTER TABLE stalls ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN DEFAULT FALSE;`);
         await pool.query(`ALTER TABLE stalls ADD COLUMN IF NOT EXISTS verification_token VARCHAR(255);`);
 
-        console.log("Database initialized: 'users', 'feedbacks', and 'stalls' tables are ready.");
+        console.log("✅ Database initialized: 'users', 'feedbacks', and 'stalls' tables are ready.");
     } catch (err) {
-        console.error("Failed to create table:", err);
+        console.error("❌ Failed to create table:", err.message);
     }
 }
 
