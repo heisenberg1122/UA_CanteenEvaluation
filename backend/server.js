@@ -11,7 +11,8 @@ const app = express();
 app.use(cors({
     origin: [
         'http://localhost:3000', 
-        'https://ua-canteen-evaluation.vercel.app' 
+        'https://ua-canteen-evaluation.vercel.app',
+        'https://ua-canteen-web.onrender.com' // <--- ADD YOUR RENDER FRONTEND HERE
     ],
     credentials: true
 }));
