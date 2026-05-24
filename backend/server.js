@@ -3,7 +3,7 @@ require('dns').setDefaultResultOrder('ipv4first');
 const express = require('express');
 const cors = require('cors');
 const routes = require('./routes');
-const { keyPairFromSeed } = require('./eddsa'); // Kept from your original code
+const { keyPairFromSeed } = require('./eddsa'); 
 
 const app = express();
 
@@ -25,15 +25,24 @@ app.use('/api', routes);
 
 // --- AUTO DB INITIALIZATION (FOR RENDER FREE TIER) ---
 const fs = require('fs');
+const path = require('path');
 const { Pool } = require('pg');
-const pool = new Pool();
+
+// Create a connection specifically for the init script with Render's SSL requirement
+const initPool = new Pool({
+    ssl: process.env.PGHOST !== 'localhost' ? { rejectUnauthorized: false } : false
+});
+
 try {
-    const sql = fs.readFileSync('./db-init.sql', 'utf8');
-    pool.query(sql)
+    // path.join(__dirname) ensures Render doesn't get lost looking for the file
+    const sqlPath = path.join(__dirname, 'db-init.sql');
+    const sql = fs.readFileSync(sqlPath, 'utf8');
+    
+    initPool.query(sql)
         .then(() => console.log('✅ Cloud Database Tables Created Successfully!'))
         .catch(err => console.log('⚠️ DB Init Notice (Tables might already exist):', err.message));
 } catch (err) {
-    console.error('Failed to read db-init.sql', err);
+    console.error('❌ Failed to read db-init.sql:', err.message);
 }
 // -----------------------------------------------------
 

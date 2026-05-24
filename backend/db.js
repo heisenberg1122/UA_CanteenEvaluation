@@ -1,11 +1,8 @@
 const { Pool } = require('pg');
 
-// Works for both local testing and Render deployments
-const pool = new Pool(
-    process.env.DATABASE_URL
-        ? { connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }
-        : {}
-);
+const pool = new Pool({
+    ssl: process.env.PGHOST !== 'localhost' ? { rejectUnauthorized: false } : false
+});
 
 async function initDB() {
     try {
