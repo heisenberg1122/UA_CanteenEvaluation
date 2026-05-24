@@ -11,6 +11,7 @@ const {
 const { verifySignature } = require('./eddsa');
 const crypto = require('crypto');
 const RESEND_FROM_EMAIL = 'system@uacanteen.site';
+const PUBLIC_BACKEND_URL = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:4000';
 
 const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
     try {
@@ -335,9 +336,8 @@ router.post('/stalls', async (req, res) => {
         const newStall = await addStall(name, image || null, email || null, verificationToken);
 
         if (email) {
-            console.log(`\n[Stall Creation] Attempting to send verification email via Gmail to: ${email}`);
-            const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
-            const verifyUrl = `${baseUrl}/api/stalls/verify-email?token=${verificationToken}`;
+            console.log(`\n[Stall Creation] Attempting to send verification email via Resend to: ${email}`);
+            const verifyUrl = `${PUBLIC_BACKEND_URL}/api/stalls/verify-email?token=${verificationToken}`;
             try {
                 const textContent = `Please verify your email for ${name} by clicking: ${verifyUrl}`;
                 const htmlContent = getVerificationEmailTemplate(name, verifyUrl);
@@ -350,9 +350,9 @@ router.post('/stalls', async (req, res) => {
                 );
 
                 if (error) {
-                    console.error("\n[Nodemailer Error - Stall Creation]:", error);
+                    console.error("\n[Resend Error - Stall Creation]:", error);
                 } else {
-                    console.log(`[Success] Verification email successfully sent via Gmail for ${email}`);
+                    console.log(`[Success] Verification email successfully sent via Resend for ${email}`);
                 }
             } catch (emailErr) {
                 console.error("\n[Server Error - Email exception]:", emailErr);
@@ -394,9 +394,8 @@ router.put('/stalls/:id', async (req, res) => {
         const updatedStall = await editStall(req.params.id, name, image || null, email || null, isVerified, verificationToken);
 
         if (emailChanged && email) {
-            console.log(`\n[Stall Update] Attempting to send verification email via Gmail to: ${email}`);
-            const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
-            const verifyUrl = `${baseUrl}/api/stalls/verify-email?token=${verificationToken}`;
+            console.log(`\n[Stall Update] Attempting to send verification email via Resend to: ${email}`);
+            const verifyUrl = `${PUBLIC_BACKEND_URL}/api/stalls/verify-email?token=${verificationToken}`;
             try {
                 const textContent = `Please verify your email for ${name} by clicking: ${verifyUrl}`;
                 const htmlContent = getVerificationEmailTemplate(name, verifyUrl);
@@ -409,9 +408,9 @@ router.put('/stalls/:id', async (req, res) => {
                 );
 
                 if (error) {
-                    console.error("\n[Nodemailer Error - Stall Update]:", error);
+                    console.error("\n[Resend Error - Stall Update]:", error);
                 } else {
-                    console.log(`[Success] Verification email successfully sent via Gmail for ${email}`);
+                    console.log(`[Success] Verification email successfully sent via Resend for ${email}`);
                 }
             } catch (emailErr) {
                 console.error("\n[Server Error - Email exception]:", emailErr);
