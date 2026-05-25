@@ -1,7 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { Resend } = require('resend');
-const resend = new Resend(process.env.RESEND_API_KEY);
+const emailjs = require('@emailjs/nodejs');
+const crypto = require('crypto');
+const cloudinary = require('cloudinary').v2;
+
 const {
     addFeedback, getAllFeedback, deleteFeedback, quarantineFeedback,
     getFeedbackPhoto,
@@ -9,44 +11,60 @@ const {
     getStallByToken, verifyStallEmail
 } = require('./db');
 const { verifySignature } = require('./eddsa');
-const crypto = require('crypto');
-const RESEND_FROM_EMAIL = 'system@uacanteen.site';
-const PUBLIC_BACKEND_URL = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:4000';
-
-const sendEmail = async (toEmail, subject, textContent, htmlContent = null, attachmentBuffer = null, attachmentName = null) => {
-    try {
-        const payload = {
-            from: RESEND_FROM_EMAIL,
-            to: toEmail,
-            subject: subject,
-            text: textContent,
-            html: htmlContent
-        };
-
-        if (attachmentBuffer && attachmentName) {
-            payload.attachments = [{
-                filename: attachmentName,
-                content: attachmentBuffer.toString('base64')
-            }];
-        }
-
-        const data = await resend.emails.send(payload);
-        return { data };
-    } catch (err) {
-        console.error("Resend Error:", err);
-        return { error: err.message };
-    }
-};
+const { registerUser, loginUser, requireAuth } = require('./auth');
+const { generateStoreReport, analyzeFeedbackData } = require('./reportGenerator');
 
 // --- CLOUDINARY CONFIGURATION ---
-const cloudinary = require('cloudinary').v2;
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-const { registerUser, loginUser, requireAuth } = require('./auth');
+// --- HELPER: UPLOAD PDF TO CLOUDINARY ---
+const uploadPDFToCloudinary = (buffer, filename) => {
+    return new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+            { 
+                resource_type: 'raw', // 'raw' is required for PDFs and non-image files
+                folder: 'ua_canteen/reports',
+                public_id: filename 
+            },
+            (error, result) => {
+                if (error) reject(error);
+                else resolve(result.secure_url);
+            }
+        );
+        stream.end(buffer);
+    });
+};
+
+// --- HELPER: SEND EMAILJS ---
+const sendEmail = async (toEmail, subject, htmlContent, reportLink = "") => {
+    try {
+        const templateParams = {
+            to_email: toEmail,
+            subject: subject,
+            message: htmlContent, // Passed with {{{message}}} in the template
+            report_link: reportLink // Only used if a report is attached
+        };
+
+        const response = await emailjs.send(
+            process.env.EMAILJS_SERVICE_ID,
+            process.env.EMAILJS_TEMPLATE_ID,
+            templateParams,
+            {
+                publicKey: process.env.EMAILJS_PUBLIC_KEY,
+                privateKey: process.env.EMAILJS_PRIVATE_KEY
+            }
+        );
+        
+        return { data: response };
+    } catch (error) {
+        console.error("\n[EmailJS Error]:", error);
+        return { error: error.message || "Failed to send via EmailJS" };
+    }
+};
 
 // --- IDENTITY & AUTH ROUTES ---
 router.post('/register', registerUser);
@@ -182,9 +200,7 @@ router.put('/feedback/:id/quarantine', async (req, res) => {
     }
 });
 
-// --- PDF REPORT GENERATION ROUTE ---
-const { generateStoreReport, analyzeFeedbackData } = require('./reportGenerator');
-
+// --- PDF REPORT GENERATION ROUTES ---
 const getVerifiedFeedbacks = (feedbacks) => {
     return feedbacks.filter(row => {
         const feedbackForVerify = {
@@ -234,8 +250,7 @@ router.get('/reports/stall/:id', async (req, res) => {
     }
 });
 
-// --- STALL MANAGEMENT ROUTES (PostgreSQL) ---
-
+// --- STALL MANAGEMENT ROUTES ---
 router.get('/stalls', async (req, res) => {
     try {
         const rows = await getAllStalls();
@@ -272,29 +287,38 @@ router.post('/stalls/:id/send-report', async (req, res) => {
         });
 
         const reportData = await analyzeFeedbackData(stall.name, stallFeedbacks);
+        
+        // Generate the PDF as a buffer
         const pdfBuffer = await generateStoreReport(reportData);
 
-        const textContent = `Hello ${stall.name} owner,\n\nHere is your automated stall evaluation update.\n\nAI Summary & Recommendations:\n${reportData.ai_summary || 'Please find the details in the attached report.'}\n\nBest,\nUA Canteen System`;
-        const filename = `Evaluation_Report_${stall.name.replace(/\s+/g, '_')}.pdf`;
+        // Upload to Cloudinary to bypass EmailJS size limits
+        const filename = `Evaluation_Report_${stall.name.replace(/\s+/g, '_')}`;
+        const pdfUrl = await uploadPDFToCloudinary(pdfBuffer, filename);
+
+        // Send EmailJS email with the link
+        const htmlContent = `
+            <h2>Automated Evaluation Report</h2>
+            <p>Hello ${stall.name} owner,</p>
+            <p>Here is your automated stall evaluation update based on verified student feedback.</p>
+            <h3>AI Summary & Recommendations:</h3>
+            <p>${reportData.ai_summary || 'Please find the detailed statistics in your full report.'}</p>
+        `;
         
         const { error } = await sendEmail(
             stall.email, 
-            `Automated Evaluation Report: ${stall.name}`, 
-            textContent, 
-            null, 
-            pdfBuffer, 
-            filename
+            `Your Evaluation Report: ${stall.name}`, 
+            htmlContent, 
+            pdfUrl // Passing the secure Cloudinary link
         );
 
         if (error) {
-            console.error("\n[Nodemailer Error - Send Report]:", error);
             return res.status(500).json({ error: "Failed to send stall report email." });
         }
 
         res.json({ success: true, message: "Report sent successfully." });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ error: "Failed to send stall report email." });
+        res.status(500).json({ error: "Failed to generate or send stall report." });
     }
 });
 
@@ -306,14 +330,10 @@ const getVerificationEmailTemplate = (name, verifyUrl) => `
   <div style="padding: 30px; background-color: #ffffff; color: #333333;">
     <h2 style="margin-top: 0; color: #0c2340;">Verify Your Stall Account</h2>
     <p style="font-size: 16px; line-height: 1.5;">Hello,</p>
-    <p style="font-size: 16px; line-height: 1.5;">You have been registered as the official owner of <strong>${name}</strong> on the UA Canteen Evaluation platform. To verify your identity and start receiving automated AI feedback reports, please click the secure link below.</p>
+    <p style="font-size: 16px; line-height: 1.5;">You have been registered as the official owner of <strong>${name}</strong>. Please click below to verify.</p>
     <div style="text-align: center; margin: 35px 0;">
       <a href="${verifyUrl}" style="background-color: #e5a823; color: #0c2340; padding: 14px 28px; text-decoration: none; font-weight: bold; border-radius: 6px; font-size: 16px; display: inline-block;">Verify Email Address</a>
     </div>
-    <p style="font-size: 14px; color: #666666; margin-top: 30px;">If you did not request this, please safely ignore this email.</p>
-  </div>
-  <div style="background-color: #f1f5f9; padding: 15px; text-align: center; font-size: 12px; color: #94a3b8;">
-    &copy; ${new Date().getFullYear()} UA Canteen Evaluation System. This is an automated secure message.
   </div>
 </div>
 `;
@@ -336,27 +356,16 @@ router.post('/stalls', async (req, res) => {
         const newStall = await addStall(name, image || null, email || null, verificationToken);
 
         if (email) {
-            console.log(`\n[Stall Creation] Attempting to send verification email via Resend to: ${email}`);
-            const verifyUrl = `${PUBLIC_BACKEND_URL}/api/stalls/verify-email?token=${verificationToken}`;
-            try {
-                const textContent = `Please verify your email for ${name} by clicking: ${verifyUrl}`;
-                const htmlContent = getVerificationEmailTemplate(name, verifyUrl);
-                
-                const { error } = await sendEmail(
-                    email,
-                    `Action Required: Verify ${name} Email`,
-                    textContent,
-                    htmlContent
-                );
-
-                if (error) {
-                    console.error("\n[Resend Error - Stall Creation]:", error);
-                } else {
-                    console.log(`[Success] Verification email successfully sent via Resend for ${email}`);
-                }
-            } catch (emailErr) {
-                console.error("\n[Server Error - Email exception]:", emailErr);
-            }
+            const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+            const verifyUrl = `${baseUrl}/api/stalls/verify-email?token=${verificationToken}`;
+            const htmlContent = getVerificationEmailTemplate(name, verifyUrl);
+            
+            const { error } = await sendEmail(
+                email,
+                `Action Required: Verify ${name} Email`,
+                htmlContent
+            );
+            if (error) console.error("\n[Email Error]:", error);
         }
 
         res.json(newStall);
@@ -394,27 +403,16 @@ router.put('/stalls/:id', async (req, res) => {
         const updatedStall = await editStall(req.params.id, name, image || null, email || null, isVerified, verificationToken);
 
         if (emailChanged && email) {
-            console.log(`\n[Stall Update] Attempting to send verification email via Resend to: ${email}`);
-            const verifyUrl = `${PUBLIC_BACKEND_URL}/api/stalls/verify-email?token=${verificationToken}`;
-            try {
-                const textContent = `Please verify your email for ${name} by clicking: ${verifyUrl}`;
-                const htmlContent = getVerificationEmailTemplate(name, verifyUrl);
-                
-                const { error } = await sendEmail(
-                    email,
-                    `Action Required: Verify ${name} Email`,
-                    textContent,
-                    htmlContent
-                );
-
-                if (error) {
-                    console.error("\n[Resend Error - Stall Update]:", error);
-                } else {
-                    console.log(`[Success] Verification email successfully sent via Resend for ${email}`);
-                }
-            } catch (emailErr) {
-                console.error("\n[Server Error - Email exception]:", emailErr);
-            }
+            const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+            const verifyUrl = `${baseUrl}/api/stalls/verify-email?token=${verificationToken}`;
+            const htmlContent = getVerificationEmailTemplate(name, verifyUrl);
+            
+            const { error } = await sendEmail(
+                email,
+                `Action Required: Verify ${name} Email`,
+                htmlContent
+            );
+            if (error) console.error("\n[Email Error]:", error);
         }
 
         res.json(updatedStall);
