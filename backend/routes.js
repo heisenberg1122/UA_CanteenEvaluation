@@ -40,13 +40,14 @@ const uploadPDFToCloudinary = (buffer, filename) => {
 };
 
 // --- HELPER: SEND EMAILJS ---
-const sendEmail = async (toEmail, subject, htmlContent, reportLink = "") => {
+const sendEmail = async (toEmail, subject, htmlContent, reportLink = "", customAuthor = "UA Canteen Administration") => {
     try {
         const templateParams = {
             to_email: toEmail,
+            from_name: customAuthor,
             subject: subject,
-            message: htmlContent, // Passed with {{{message}}} in the template
-            report_link: reportLink // Only used if a report is attached
+            message: htmlContent,
+            report_link: reportLink
         };
 
         const response = await emailjs.send(
