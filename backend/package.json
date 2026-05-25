@@ -11,6 +11,7 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@emailjs/nodejs": "^5.0.2",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.9.0",
     "cors": "^2.8.6",
@@ -20,7 +21,6 @@
     "nodemailer": "^8.0.8",
     "pdfkit": "^0.18.0",
     "pg": "^8.20.0",
-    "resend": "^6.12.3",
     "tweetnacl": "^1.0.3",
     "tweetnacl-util": "^0.15.1"
   }
