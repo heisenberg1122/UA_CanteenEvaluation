@@ -292,7 +292,7 @@ router.post('/stalls/:id/send-report', async (req, res) => {
         const pdfBuffer = await generateStoreReport(reportData);
 
         // Upload to Cloudinary to bypass EmailJS size limits
-        const filename = `Evaluation_Report_${stall.name.replace(/\s+/g, '_')}`;
+        const filename = `Evaluation_Report_${stall.name.replace(/\s+/g, '_')}.pdf`;
         const pdfUrl = await uploadPDFToCloudinary(pdfBuffer, filename);
 
         // Send EmailJS email with the link
